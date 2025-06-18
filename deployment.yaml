@@ -1,0 +1,130 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: pod-to-clb-controller
+    version: go
+  name: pod-to-clb-controller-go
+  namespace: default
+spec:
+  progressDeadlineSeconds: 600
+  replicas: 1
+  revisionHistoryLimit: 10
+  selector:
+    matchLabels:
+      app: pod-to-clb-controller
+      version: go
+  strategy:
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+    type: RollingUpdate
+  template:
+    metadata:
+      annotations:
+        eks.tke.cloud.tencent.com/root-cbs-size: "20"
+        eks.tke.cloud.tencent.com/security-group-id: sg-g1m3xfcn
+      labels:
+        app: pod-to-clb-controller
+        version: go
+    spec:
+      containers:
+        - name: server
+          image: hub.docker.com/oaixnah/sync-pod-to-clb:go-latest
+          imagePullPolicy: Always
+          env:
+            - name: CLOUD_TENCENT_SECRET_ID
+              valueFrom:
+                secretKeyRef:
+                  name: tencent-cloud-secret
+                  key: secret-id
+            - name: CLOUD_TENCENT_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: tencent-cloud-secret
+                  key: secret-key
+            - name: TENCENT_REGION
+              value: "ap-beijing"
+          resources:
+            limits:
+              cpu: '1'
+              memory: 256Mi
+            requests:
+              cpu: '0.5'
+              memory: 128Mi
+          securityContext:
+            privileged: false
+            runAsNonRoot: true
+            runAsUser: 1001
+            runAsGroup: 1001
+            readOnlyRootFilesystem: true
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+          terminationMessagePath: /dev/termination-log
+          terminationMessagePolicy: File
+          # 健康检查（可选）
+          # livenessProbe:
+          #   httpGet:
+          #     path: /health
+          #     port: 8080
+          #   initialDelaySeconds: 30
+          #   periodSeconds: 10
+          # readinessProbe:
+          #   httpGet:
+          #     path: /ready
+          #     port: 8080
+          #   initialDelaySeconds: 5
+          #   periodSeconds: 5
+      dnsPolicy: ClusterFirst
+      imagePullSecrets:
+        - name: ops
+      restartPolicy: Always
+      schedulerName: default-scheduler
+      terminationGracePeriodSeconds: 30
+      serviceAccountName: pod-to-clb-controller
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: pod-to-clb-controller
+  namespace: default
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: pod-to-clb-controller
+rules:
+- apiGroups: [""]
+  resources: ["pods"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: ["apps"]
+  resources: ["deployments", "replicasets"]
+  verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: pod-to-clb-controller
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: pod-to-clb-controller
+subjects:
+- kind: ServiceAccount
+  name: pod-to-clb-controller
+  namespace: default
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: tencent-cloud-secret
+  namespace: default
+type: Opaque
+data:
+  # 请将以下值替换为实际的 base64 编码的腾讯云密钥
+  # echo -n "your-secret-id" | base64
+  secret-id: eW91ci1zZWNyZXQtaWQ=
+  # echo -n "your-secret-key" | base64
+  secret-key: eW91ci1zZWNyZXQta2V5

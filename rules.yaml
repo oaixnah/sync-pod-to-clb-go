@@ -1,0 +1,11 @@
+- load_balancer_id: lb-***
+  listeners:
+    - port: 443
+      protocol: https
+      rules:
+        - domain: test.example.com
+          url: /
+          backend:
+            namespace: default
+            deployment: test
+            port: 80
