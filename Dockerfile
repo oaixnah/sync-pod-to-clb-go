@@ -7,14 +7,11 @@ WORKDIR /app
 # 安装必要的包
 RUN apk add --no-cache git ca-certificates tzdata
 
-# 复制 go mod 文件
-COPY go.mod go.sum ./
+# 复制文件
+COPY . .
 
-# 下载依赖
-RUN go mod download
-
-# 复制源代码
-COPY main.go tencent.go config.go ./
+# 安装依赖
+RUN go mod tidy
 
 # 构建应用
 RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o sync-pod-to-clb .
@@ -32,7 +29,6 @@ COPY --from=builder /app/sync-pod-to-clb .
 
 # 复制配置文件
 COPY rules.yaml .
-COPY kube-config .
 
 # 设置时区
 ENV TZ=Asia/Shanghai
